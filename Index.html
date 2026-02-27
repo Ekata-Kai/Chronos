@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronos Pro - Gestión de Trabajo</title>
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2666/2666505.png">
+<link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2666/2666505.png">
+
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0c">
+
+    <style>
+        :root {
+            --bg: #0a0a0c; --card: #16161a; --accent: #00ff41; --text: #ffffff;
+            --glass: rgba(255, 255, 255, 0.05); --error: #ff3300;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text);
+            margin: 0; display: flex; height: 100vh; overflow: hidden;
+        }
+
+        /* Barra Lateral Izquierda */
+        .sidebar {
+            width: 70px; background: #111; border-right: 1px solid #333;
+            display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 20px;
+        }
+
+        .side-btn {
+            width: 45px; height: 45px; border-radius: 12px; background: var(--glass);
+            border: 1px solid #333; color: var(--accent); cursor: pointer; font-size: 18px;
+            display: flex; align-items: center; justify-content: center; transition: 0.3s;
+        }
+        .side-btn:hover { background: var(--accent); color: #000; }
+
+        /* Panel de Control Derecho (Tags y Filtros) */
+        .control-panel {
+            width: 240px; background: #111; border-left: 1px solid #333;
+            padding: 20px; display: flex; flex-direction: column; gap: 15px;
+        }
+
+        .main-container { flex: 1; padding: 25px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+
+        /* Editor */
+        .editor-card { background: var(--card); border-radius: 18px; padding: 20px; border: 1px solid #222; }
+        textarea {
+            width: 100%; height: 250px; background: transparent; border: none; color: #ddd;
+            font-size: 1rem; resize: none; outline: none; line-height: 1.6;
+        }
+
+        .tag {
+            display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px;
+            background: #222; border: 1px solid #444; margin: 2px; cursor: pointer;
+        }
+        .tag:hover { border-color: var(--accent); color: var(--accent); }
+
+        .mood-selector { display: flex; gap: 10px; margin-bottom: 15px; font-size: 20px; }
+        .mood-btn { cursor: pointer; opacity: 0.3; transition: 0.3s; }
+        .mood-btn.active { opacity: 1; transform: scale(1.2); }
+
+        .search-bar {
+            width: 100%; padding: 10px; background: #222; border: 1px solid #333;
+            border-radius: 8px; color: white; margin-bottom: 15px;
+        }
+
+        /* Semanas */
+        .week-block { background: var(--glass); border-left: 4px solid var(--accent); padding: 15px; border-radius: 0 12px 12px 0; margin-bottom: 15px; }
+        .week-title { color: var(--accent); font-weight: bold; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px; display: block; }
+        
+        .entry-item { border-bottom: 1px solid #222; padding: 10px 0; }
+        .entry-date { font-size: 11px; color: var(--accent); }
+        
+        .btn { padding: 8px 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-add { background: var(--accent); color: #000; width: 100%; }
+        .btn-check { background: #333; color: white; font-size: 12px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <button class="side-btn" onclick="showView('edit')">📝</button>
+        <button class="side-btn" onclick="showView('summary')">📊</button>
+        <button class="side-btn" onclick="exportExcel()" style="color: #44aaff">📁</button>
+    </nav>
+
+    <main class="main-container">
+        <div id="view-edit">
+            <h2 id="displayDate" style="margin:0; color:var(--accent)">-</h2>
+            <div class="mood-selector" style="margin-top:15px">
+                <span class="mood-btn" onclick="setMood(1)">😫</span>
+                <span class="mood-btn" onclick="setMood(2)">😐</span>
+                <span class="mood-btn active" onclick="setMood(3)">🙂</span>
+                <span class="mood-btn" onclick="setMood(4)">🤩</span>
+                <span class="mood-btn" onclick="setMood(5)">🔥</span>
+            </div>
+            <div class="editor-card">
+                <button class="btn btn-check" onclick="insertCheck()">+ Checklist [ ]</button>
+                <textarea id="noteInput" placeholder="Describe tus tareas de hoy..."></textarea>
+                <div id="assignedTags" style="margin-top:10px"></div>
+                <button class="btn btn-add" onclick="saveData()" style="margin-top:15px">GUARDAR BITÁCORA</button>
+            </div>
+        </div>
+
+        <div id="view-summary" style="display:none">
+            <input type="text" class="search-bar" id="searchInput" placeholder="Buscar en bitácora..." oninput="renderSummary()">
+            <select id="monthSelector" style="background:#222; color:white; padding:8px; border-radius:8px;" onchange="renderSummary()"></select>
+            <div id="weeksContainer" style="margin-top:20px"></div>
+        </div>
+    </main>
+
+    <aside class="control-panel">
+        <h4 style="margin:0; font-size:12px; color:#888">MIS ETIQUETAS</h4>
+        <div id="tagList" style="min-height: 100px;"></div>
+        <input type="text" id="newTagInput" placeholder="Nueva etiqueta..." style="background:#222; border:1px solid #333; padding:8px; color:white; border-radius:5px;">
+        <button class="btn btn-add" style="font-size:11px; padding:5px" onclick="createTag()">CREAR +</button>
+    </aside>
+
+    <script>
+        let db = JSON.parse(localStorage.getItem('chronos_db')) || {};
+        let myTags = JSON.parse(localStorage.getItem('chronos_tags')) || ["#Pendiente", "#Urgente"];
+        let currentMood = 3;
+        let selectedTags = [];
+
+        const getToday = () => new Date().toISOString().split('T')[0];
+
+        function init() {
+            const today = getToday();
+            document.getElementById('displayDate').innerText = today.split('-').reverse().join(' / ');
+            if(db[today]) {
+                document.getElementById('noteInput').value = db[today].text;
+                currentMood = db[today].mood || 3;
+                selectedTags = db[today].tags || [];
+                setMood(currentMood);
+            }
+            renderTags();
+            updateMonthSelector();
+        }
+
+        function setMood(val) {
+            currentMood = val;
+            document.querySelectorAll('.mood-btn').forEach((b, i) => {
+                b.classList.toggle('active', i + 1 === val);
+            });
+        }
+
+        function createTag() {
+            const name = document.getElementById('newTagInput').value.trim();
+            if(name && !myTags.includes(name)) {
+                myTags.push(name.startsWith('#') ? name : '#' + name);
+                localStorage.setItem('chronos_tags', JSON.stringify(myTags));
+                renderTags();
+                document.getElementById('newTagInput').value = '';
+            }
+        }
+
+        function renderTags() {
+            const list = document.getElementById('tagList');
+            list.innerHTML = myTags.map(t => `<span class="tag" onclick="toggleTag('${t}')">${t}</span>`).join('');
+            
+            const assigned = document.getElementById('assignedTags');
+            assigned.innerHTML = selectedTags.map(t => `<span class="tag" style="border-color:var(--accent)">${t}</span>`).join('');
+        }
+
+        function toggleTag(t) {
+            if(selectedTags.includes(t)) selectedTags = selectedTags.filter(i => i !== t);
+            else selectedTags.push(t);
+            renderTags();
+        }
+
+        function insertCheck() {
+            const area = document.getElementById('noteInput');
+            area.value += "\n[ ] ";
+            area.focus();
+        }
+
+        function saveData() {
+            const today = getToday();
+            db[today] = {
+                text: document.getElementById('noteInput').value,
+                mood: currentMood,
+                tags: selectedTags
+            };
+            localStorage.setItem('chronos_db', JSON.stringify(db));
+            alert("✅ Bitácora actualizada");
+            updateMonthSelector();
+        }
+
+        function showView(v) {
+            document.getElementById('view-edit').style.display = v === 'edit' ? 'block' : 'none';
+            document.getElementById('view-summary').style.display = v === 'summary' ? 'block' : 'none';
+            if(v === 'summary') renderSummary();
+        }
+
+        function updateMonthSelector() {
+            const months = [...new Set(Object.keys(db).map(d => d.substring(0, 7)))].sort().reverse();
+            document.getElementById('monthSelector').innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+        }
+
+        function renderSummary() {
+            const month = document.getElementById('monthSelector').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const container = document.getElementById('weeksContainer');
+            container.innerHTML = '';
+
+            const days = Object.keys(db).filter(d => d.startsWith(month)).sort();
+            const weeks = [[], [], [], []];
+            
+            days.forEach(d => {
+                const dayNum = parseInt(d.split('-')[2]);
+                const content = db[d].text.toLowerCase() + db[d].tags.join(' ').toLowerCase();
+                if(search && !content.includes(search)) return;
+
+                if(dayNum <= 7) weeks[0].push(d);
+                else if(dayNum <= 14) weeks[1].push(d);
+                else if(dayNum <= 21) weeks[2].push(d);
+                else weeks[3].push(d);
+            });
+
+            const moods = ["", "😫", "😐", "🙂", "🤩", "🔥"];
+
+            weeks.forEach((wDays, i) => {
+                if(wDays.length === 0) return;
+                let html = `<div class="week-block"><span class="week-title">Semana ${i+1}</span>`;
+                wDays.forEach(d => {
+                    html += `<div class="entry-item">
+                        <span class="entry-date">${d} ${moods[db[d].mood]}</span><br>
+                        <div style="font-size:13px; color:#ccc; margin:5px 0;">${db[d].text.replace(/\n/g, '<br>')}</div>
+                        ${db[d].tags.map(t => `<span class="tag" style="font-size:9px">${t}</span>`).join('')}
+                    </div>`;
+                });
+                container.innerHTML += html + `</div>`;
+            });
+        }
+
+        function exportExcel() {
+            let csv = "Fecha,Animo,Etiquetas,Nota\n";
+            Object.keys(db).forEach(d => {
+                const row = `"${d}","${db[d].mood}","${db[d].tags.join('|')}","${db[d].text.replace(/"/g, '""')}"`;
+                csv += row + "\n";
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Bitacora_Trabajo.csv`;
+            a.click();
+        }
+
+        init();
+    </script>
+</body>
+  </html>
+
